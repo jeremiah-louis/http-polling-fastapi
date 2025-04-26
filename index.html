@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Podcast Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+        #status {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        .pending {
+            color: orange;
+        }
+        .completed {
+            color: green;
+        }
+    </style>
+</head>
+<body>
+    <h1>Client Polling Simulator</h1>
+    <div class="form-group">
+        <label for="url">Enter URL:</label>
+        <input type="text" id="url" placeholder="https://example.com/podcast">
+    </div>
+    <button onclick="generatePodcast()">Generate Podcast</button>
+    <div id="status"></div>
+
+    <script>
+        let currentTaskId = null;
+        let pollInterval = null;
+
+        async function generatePodcast() {
+            const url = document.getElementById('url').value;
+            // If no URL provided, use empty string which will trigger the backend's fallback URL
+            const requestUrl = url || '';
+
+            try {
+                const response = await fetch('http://localhost:8000/generate', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: requestUrl }),
+                });
+
+                const data = await response.json();
+                currentTaskId = data.task_id;
+                
+                // Clear any existing polling
+                if (pollInterval) {
+                    clearInterval(pollInterval);
+                }
+
+                // Start polling
+                pollStatus();
+                pollInterval = setInterval(pollStatus, 2000); // Poll every 2 seconds
+            } catch (error) {
+                console.error('Error:', error);
+                document.getElementById('status').innerHTML = 'Error generating podcast';
+            }
+        }
+
+        async function pollStatus() {
+            if (!currentTaskId) return;
+
+            try {
+                const response = await fetch(`http://localhost:8000/status/${currentTaskId}`);
+                const data = await response.json();
+                
+                const statusDiv = document.getElementById('status');
+                statusDiv.innerHTML = `
+                    <p>Status: <span class="${data.status}">${data.status}</span></p>
+                    <p>URL: ${data.resource_url}</p>
+                `;
+
+                // Stop polling if task is completed
+                if (data.status === 'completed') {
+                    clearInterval(pollInterval);
+                    pollInterval = null;
+                }
+            } catch (error) {
+                console.error('Error polling status:', error);
+            }
+        }
+    </script>
+</body>
+</html> 
